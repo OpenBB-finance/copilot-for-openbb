@@ -3,11 +3,15 @@
 		"name": "Example Co. Copilot",
 		"description": "AI-powered financial analyst fine-tuned by Example Co. to answer in the company-approved tone.",
 		"image": "https://github.com/OpenBB-finance/copilot-for-terminal-pro/assets/14093308/7da2a512-93b9-478d-90bc-b8c3dd0cabcf",
-		"hasStreaming": true,
-		"hasDocuments": false,
-		"hasFunctionCalling": false,
 		"endpoints": {
 			"query": "http://localhost:7777/v1/query"
-		}
+		},
+		"features": {
+			"streaming": true,
+			"file-upload": false,
+			"widget-dashboard-select": false,
+			"widget-dashboard-search": false,
+			"widget-global-search": false
+		}		
 	}
 }
