@@ -623,7 +623,7 @@ Here is an example copilots.json configuration:
       "query": "<url>" # <-- the URL that the OpenBB Workspace will send requests to. For example, "http://localhost:7777/v1/query"
     },
     "hasStreaming": true,  // Deprecated: use features.streaming instead
-    "hasDocuments": false,  // Deprecated: use features.file-upload instead
+    "hasDocuments": false,  // Deprecated: not applicable anymore
     "hasFunctionCalling": false,  // Deprecated: use features.widget-dashboard-select, widget-dashboard-search or widget-global-search instead
     "features": {
         "streaming": true, // <-- whether your copilot supports streaming responses via SSEs. This must always be true.

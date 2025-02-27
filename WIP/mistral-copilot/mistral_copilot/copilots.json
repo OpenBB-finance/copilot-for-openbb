@@ -3,11 +3,13 @@
 		"name": "Mistral Example Co. Copilot",
 		"description": "AI-powered financial copilot that uses Mistral Large as its LLM.",
 		"image": "https://github.com/OpenBB-finance/copilot-for-terminal-pro/assets/14093308/5c7518ad-3997-4fd7-9549-909eddd272c4",
-		"hasStreaming": true,
-		"hasFunctionCalling": true,
-		"hasDocuments": false,
 		"endpoints": {
 			"query": "http://localhost:7777/v1/query"
-		}
+		},
+		"features": {
+			"streaming": true,
+			"widget-dashboard-select": true,
+			"widget-dashboard-search": true
+		}		
 	}
 }
