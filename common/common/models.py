@@ -278,7 +278,7 @@ class StatusUpdateSSEData(BaseModel):
     eventType: Literal["INFO", "WARNING", "ERROR"]
     message: str
     group: Literal["reasoning"] = "reasoning"
-    details: list[dict[str, str | int | float | None]] | None = None
+    details: list[dict[str, Any]] | None = None
     artifacts: list[ClientArtifact] | None = None
 
     @model_validator(mode="before")

@@ -1,15 +1,21 @@
 import json
-from common.models import LlmClientFunctionCallResult, LlmClientMessage
+from common.models import (
+    LlmClientFunctionCallResult,
+    LlmClientMessage,
+    StatusUpdateSSE,
+    StatusUpdateSSEData,
+)
 from magentic import (
     AssistantMessage,
     AsyncStreamedStr,
     Chat,
     FunctionCall,
+    FunctionResultMessage,
     AnyMessage,
     SystemMessage,
     UserMessage,
 )
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator, Literal
 import re
 
 
@@ -25,6 +31,20 @@ async def create_message_stream(
 ) -> AsyncGenerator[dict, None]:
     async for chunk in content:
         yield {"event": "copilotMessageChunk", "data": json.dumps({"delta": chunk})}
+
+
+def reasoning_step(
+    event_type: Literal["INFO", "WARNING", "ERROR"],
+    message: str,
+    details: dict[str, Any] | None = None,
+) -> StatusUpdateSSE:
+    return StatusUpdateSSE(
+        data=StatusUpdateSSEData(
+            eventType=event_type,
+            message=message,
+            details=[details] if details else [],
+        )
+    )
 
 
 def prepare_messages(
@@ -58,4 +78,17 @@ async def run_agent(
             return
         # Handle a function call.
         elif isinstance(chat.last_message.content, FunctionCall):
-            chat = await chat.aexec_function_call()
+            function_call_result: str = ""
+            async for event in chat.last_message.content():
+                # Yield reasoning steps.
+                if isinstance(event, StatusUpdateSSE):
+                    yield event.model_dump()
+                # Otherwise, append to the function call result.
+                else:
+                    function_call_result += str(event)
+            chat = chat.add_message(
+                FunctionResultMessage(
+                    content=function_call_result,
+                    function_call=chat.last_message.content,
+                )
+            )

@@ -45,6 +45,14 @@ class CopilotResponse:
             CopilotEvent(event_type="copilotMessage", content=captured_message_chunks)
         )
 
+    @property
+    def text(self) -> str:
+        return "".join(
+            str(event.content)
+            for event in self.events
+            if event.event_type == "copilotMessage"
+        )
+
     def __iter__(self):
         return self
 
