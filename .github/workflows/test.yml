@@ -90,7 +90,7 @@ jobs:
         run: |
           cd 03-simple-copilot-reasoning-steps
           poetry run pytest tests
-  example-copilot:
+  simple-copilot-rfc:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -110,12 +110,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
-          cd example-copilot
+          cd 04-simple-copilot-openbb-function-calling
           python -m pip install --upgrade pip
           poetry install
       - name: Run Pytest
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          cd example-copilot
+          cd 04-simple-copilot-openbb-function-calling
           poetry run pytest tests

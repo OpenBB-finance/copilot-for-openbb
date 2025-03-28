@@ -17,8 +17,8 @@ from common import agent
 from common.models import (
     AgentQueryRequest,
 )
-from .prompts import SYSTEM_PROMPT
-from .functions import get_random_palettes
+from .prompts import render_system_prompt
+from .functions import get_widget_data
 
 
 logging.basicConfig(level=logging.INFO)
@@ -56,15 +56,21 @@ def get_copilot_description():
 async def query(request: AgentQueryRequest) -> EventSourceResponse:
     """Query the Copilot."""
 
+    functions = [get_widget_data(widget_collection=request.widgets)]
+
     chat = Chat(
-        messages=await agent.process_messages(SYSTEM_PROMPT, request.messages),
+        messages=await agent.process_messages(
+            system_prompt=render_system_prompt(widget_collection=request.widgets),
+            messages=request.messages,
+            functions=functions,
+        ),
         output_types=[AsyncStreamedStr, FunctionCall],
-        functions=[get_random_palettes],  # Add the function to the LLM.
+        functions=functions,
     )
 
     # This is the main execution loop for the Copilot.
     async def execution_loop(chat: Chat):
-        async for event in agent.run_agent(chat):
+        async for event in agent.run_agent(chat=chat):
             yield event
 
     # Stream the SSEs back to the client.

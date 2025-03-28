@@ -88,9 +88,10 @@ def test_query_local_function_call():
 
         copilot_response = CopilotResponse(response.text)
         assert (
-            copilot_response.starts_with("copilotMessage", "Mock")
-            .and_("#FF0000")
-            .and_("#00FF00")
-            .and_("#0000FF")
-            .and_("colourlovers.com")
+            copilot_response.starts("copilotMessage")
+            .with_("Mock")
+            .with_("#FF0000")
+            .with_("#00FF00")
+            .with_("#0000FF")
+            .with_("colourlovers.com")
         )

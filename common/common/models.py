@@ -85,8 +85,8 @@ class LlmClientFunctionCallResult(BaseModel):
     data: list[DataContent | DataFileReference] = Field(
         description="The content of the function call."
     )
-    extra_state: dict[str, Any] | None = Field(
-        default=None,
+    extra_state: dict[str, Any] = Field(
+        default_factory=dict,
         description="Extra state to be passed between the client and this service.",
     )
 
@@ -211,6 +211,7 @@ class AgentQueryRequest(BaseModel):
 
 
 class DataSourceRequest(BaseModel):
+    widget_uuid: str
     origin: str
     id: str
     input_args: dict[str, Any]
@@ -220,9 +221,6 @@ class FunctionCallResponse(BaseModel):
     function: str = Field(description="The name of the function to call.")
     input_arguments: dict | None = Field(
         default=None, description="The input arguments to the function."
-    )
-    copilot_function_call_arguments: dict | None = Field(
-        default=None, description="The original arguments of the function call."
     )
     extra_state: dict | None = Field(
         default=None,
@@ -244,10 +242,7 @@ class BaseSSE(BaseModel):
 class FunctionCallSSEData(BaseModel):
     function: Literal["get_widget_data"]
     input_arguments: dict
-    copilot_function_call_arguments: dict | None = Field(
-        default=None,
-        description="The original arguments of the function call to copilot. This may be different to what is actually returned as the function call to the client.",  # noqa: E501
-    )
+    extra_state: dict | None = None
 
 
 class FunctionCallSSE(BaseSSE):

@@ -41,9 +41,12 @@ class CopilotResponse:
                     CopilotEvent(event_type=event_name, content=data_dict_)
                 )
 
-        self.events.append(
-            CopilotEvent(event_type="copilotMessage", content=captured_message_chunks)
-        )
+        if captured_message_chunks:
+            self.events.append(
+                CopilotEvent(
+                    event_type="copilotMessage", content=captured_message_chunks
+                )
+            )
 
     @property
     def text(self) -> str:
@@ -52,6 +55,12 @@ class CopilotResponse:
             for event in self.events
             if event.event_type == "copilotMessage"
         )
+
+    @property
+    def function_calls(self) -> list[CopilotEvent]:
+        return [
+            event for event in self.events if event.event_type == "copilotFunctionCall"
+        ]
 
     def __iter__(self):
         return self
@@ -64,46 +73,56 @@ class CopilotResponse:
         else:
             raise StopIteration
 
-    def starts_with(self, event_type: str, content_contains: str):
+    def _check_equals(self, event, content_contains: str | dict):
+        if isinstance(content_contains, str):
+            assert content_contains in str(event.content)
+        elif isinstance(content_contains, dict):
+            for key, value in content_contains.items():
+                assert key in event.content
+                assert event.content[key] == value
+        else:
+            raise ValueError(f"Invalid content_contains type: {type(content_contains)}")
+
+    def starts(self, event_type: str):
         self.index = 0
         assert self.events[self.index].event_type == event_type
-        assert content_contains in str(self.events[self.index].content)
         return self
 
-    def then(self, event_type: str, content_contains: str):
+    def with_(self, content_contains: str | dict):
+        self._check_equals(self.events[self.index], content_contains)
+        return self
+
+    def then(self, event_type: str):
         self.index += 1
         assert self.events[self.index].event_type == event_type
-        assert content_contains in str(self.events[self.index].content)
         return self
 
     def and_(self, content_contains: str):
-        assert content_contains in str(self.events[self.index].content)
+        # assert content_contains in str(self.events[self.index].content)
+        self._check_equals(self.events[self.index], content_contains)
         return self
 
-    def and_not(self, content_contains: str):
+    def with_not(self, content_contains: str):
         assert content_contains not in str(self.events[self.index].content)
         return self
 
-    def then_not(self, event_type: str, content_contains: str):
+    def then_not(self, event_type: str):
         self.index += 1
         assert self.events[self.index].event_type != event_type
-        assert content_contains not in str(self.events[self.index].content)
         return self
 
     def then_ignore(self):
         self.index += 1
         return self
 
-    def ends_with(self, event_type: str, content_contains: str):
+    def ends(self, event_type: str):
         self.index = len(self.events) - 1
         assert self.events[self.index].event_type == event_type
-        assert content_contains in str(self.events[self.index].content)
         return self
 
-    def ends_with_not(self, event_type: str, content_contains: str):
+    def ends_not(self, event_type: str):
         self.index = len(self.events) - 1
-        assert self.events[self.index].event_type == event_type
-        assert content_contains not in str(self.events[self.index].content)
+        assert self.events[self.index].event_type != event_type
         return self
 
     def has_any(self, event_type: str, content_contains: str):
