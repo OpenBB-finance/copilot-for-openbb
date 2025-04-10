@@ -22,8 +22,15 @@ from magentic import (
     SystemMessage,
     UserMessage,
 )
-from typing import Any, AsyncGenerator, Awaitable, Callable, Literal
+from typing import Any, AsyncGenerator, Awaitable, Callable, Literal, cast
 import re
+from openai import AsyncOpenAI
+from openai.types.chat import (
+    ChatCompletionMessageParam,
+    ChatCompletionSystemMessageParam,
+    ChatCompletionUserMessageParam,
+    ChatCompletionAssistantMessageParam,
+)
 
 
 def sanitize_message(message: str) -> str:
@@ -141,6 +148,20 @@ async def process_messages(
     system_prompt: str,
     messages: list[LlmClientFunctionCallResult | LlmClientMessage],
     functions: list[Any] | None = None,
+    kind: Literal["magentic", "openai"] = "magentic",
+) -> list[AnyMessage] | list[ChatCompletionMessageParam]:
+    if kind == "magentic":
+        return await _process_messages_magentic(system_prompt, messages, functions)
+    elif kind == "openai":
+        return await _process_messages_openai(system_prompt, messages)
+
+    raise ValueError(f"Unsupported kind: {kind}")
+
+
+async def _process_messages_magentic(
+    system_prompt: str,
+    messages: list[LlmClientFunctionCallResult | LlmClientMessage],
+    functions: list[Any] | None = None,
 ) -> list[AnyMessage]:
     chat_messages: list[AnyMessage] = [SystemMessage(system_prompt)]
     for message in messages:
@@ -192,6 +213,32 @@ async def process_messages(
     return chat_messages
 
 
+async def _process_messages_openai(
+    system_prompt: str,
+    messages: list[LlmClientFunctionCallResult | LlmClientMessage],
+) -> list[ChatCompletionMessageParam]:
+    chat_messages: list[ChatCompletionMessageParam] = [
+        ChatCompletionSystemMessageParam(role="system", content=system_prompt)
+    ]
+    for message in messages:
+        match message:
+            case LlmClientMessage(role="human"):
+                chat_messages.append(
+                    ChatCompletionUserMessageParam(
+                        role="user", content=cast(str, message.content)
+                    )
+                )
+            case LlmClientMessage(role="ai") if isinstance(message.content, str):
+                chat_messages.append(
+                    ChatCompletionAssistantMessageParam(
+                        role="assistant", content=message.content
+                    )
+                )
+            case _:
+                raise ValueError(f"Unsupported message type: {message}")
+    return chat_messages
+
+
 async def run_agent(
     chat: Chat, max_completions: int = 10
 ) -> AsyncGenerator[dict, None]:
@@ -224,3 +271,44 @@ async def run_agent(
                     function_call=chat.last_message.content,
                 )
             )
+
+
+async def run_openrouter_agent(
+    messages: list[ChatCompletionMessageParam],
+    model: str,
+    api_key: str,
+) -> AsyncGenerator[dict | StatusUpdateSSE, None]:
+    client = AsyncOpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=api_key,
+    )
+
+    stream = await client.chat.completions.create(
+        model=model, messages=messages, stream=True
+    )
+
+    reasoning = ""
+    async for chunk in stream:
+        if chunk.choices[0].delta.content:
+            if reasoning:
+                yield reasoning_step(
+                    event_type="INFO",
+                    message="Reasoning complete",
+                    details={"Reasoning": reasoning},
+                ).model_dump()
+                reasoning = ""
+            yield {
+                "event": "copilotMessageChunk",
+                "data": json.dumps({"delta": chunk.choices[0].delta.content}),
+            }
+        elif (
+            hasattr(chunk.choices[0].delta, "reasoning")
+            and chunk.choices[0].delta.reasoning
+        ):
+            if not reasoning:
+                yield reasoning_step(
+                    event_type="INFO",
+                    message="Reasoning...",
+                ).model_dump()
+            reasoning += chunk.choices[0].delta.reasoning  # type: ignore
+    return

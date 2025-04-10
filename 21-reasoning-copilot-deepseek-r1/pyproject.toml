@@ -1,0 +1,31 @@
+[tool.poetry]
+name = "copilot-for-openbb"
+version = "0.1.0"
+description = ""
+authors = ["Michael Struwig <michael.struwig@openbb.finance>"]
+readme = "README.md"
+package-mode = false
+[tool.poetry.dependencies]
+python = "^3.10"
+fastapi = "^0.115.0"
+uvicorn = "^0.27.0.post1"
+python-dotenv = "^1.0.1"
+httpx = "^0.26.0"
+sse-starlette = "^2.1.2"
+magentic = {extras = ["litellm"], version = "^0.39.2"}
+common = {path = "../common", develop = true}
+pdfplumber = "^0.11.5"
+mypy = "^1.15.0"
+
+
+[tool.poetry.group.development.dependencies]
+ruff = "^0.8.0"
+pytest = "^8.3.1"
+pytest-asyncio = "^0.23.8"
+
+[tool.mypy]
+ignore_missing_imports = true
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
