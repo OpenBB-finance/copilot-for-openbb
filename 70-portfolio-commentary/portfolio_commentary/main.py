@@ -36,7 +36,22 @@ import uuid
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-load_dotenv(".env")
+# Load environment variables from .env file if it exists
+env_path = Path(__file__).parent.parent / ".env"
+if env_path.exists():
+    load_dotenv(env_path)
+    logger.info(f"Loaded .env file from {env_path}")
+else:
+    logger.info("No .env file found, using environment variables")
+
+# Debug logging for API key
+api_key = os.environ.get("OPENROUTER_API_KEY")
+if api_key:
+    logger.info("OPENROUTER_API_KEY is set")
+    logger.info(f"API Key first 10 chars: {api_key[:10]}...")
+else:
+    logger.error("OPENROUTER_API_KEY is not set!")
+
 app = FastAPI()
 
 origins = [
@@ -62,7 +77,7 @@ async def root():
     return {
         "name": "Portfolio Commentary API",
         "version": "1.0.0",
-        "endpoints": ["/v1/query", "/copilots.json"],
+        "endpoints": ["/v1/query", "/agents.json"],
         "status": "operational",
     }
 
@@ -78,7 +93,7 @@ async def perplexity_web_search(query: str) -> str:
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://pro.openbb.dev",  # Required by OpenRouter
+        "HTTP-Referer": "https://pro.openbb.co",  # Required by OpenRouter
         "X-Title": "OpenBB Terminal Pro",  # Optional but recommended
     }
     data = {
@@ -232,11 +247,11 @@ async def custom_run_agent(
             return
 
 
-@app.get("/copilots.json")
+@app.get("/agents.json")
 def get_copilot_description():
     """Widgets configuration file for the OpenBB Terminal Pro"""
     return JSONResponse(
-        content=json.load(open((Path(__file__).parent.resolve() / "copilots.json")))
+        content=json.load(open((Path(__file__).parent.resolve() / "agents.json")))
     )
 
 

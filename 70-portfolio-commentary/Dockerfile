@@ -25,5 +25,9 @@ RUN poetry config virtualenvs.create false \
 # Expose the port the app will run on
 EXPOSE 7777
 
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+
 # Command to run the application
 CMD ["uvicorn", "portfolio_commentary.main:app", "--host", "0.0.0.0", "--port", "7777", "--reload"]
