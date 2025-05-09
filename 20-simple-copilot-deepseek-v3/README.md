@@ -19,7 +19,7 @@ This is an example agent, powered by [DeepSeek-v3-0324](https://huggingface.co/d
 The architecture consists of two main components:
 
 1. **OpenBB Workspace (Frontend)**: The user interface where queries are entered
-2. **Simple Copilot (Backend)**: Powered by OpenAI, handles the processing of queries and returns answers
+2. **Simple Copilot (Backend)**: Powered by DeepSeek-v3-0324, handles the processing of queries and returns answers
 
 The frontend communicates with the backend via HTTP requests to the `/query`
 endpoint as defined in the copilot.json schema.

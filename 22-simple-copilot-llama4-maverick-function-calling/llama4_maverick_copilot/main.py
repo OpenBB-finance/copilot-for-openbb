@@ -1,19 +1,18 @@
-import json
 import logging
-from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sse_starlette.sse import EventSourceResponse
 
-from .prompts import SYSTEM_PROMPT
+from .prompts import render_system_prompt
 
 from dotenv import load_dotenv
 from common import agent
 from common.models import (
     QueryRequest,
 )
+from .functions import get_random_stout_beers, get_widget_data
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -42,7 +41,19 @@ app.add_middleware(
 def get_copilot_description():
     """Widgets configuration file for the OpenBB Terminal Pro"""
     return JSONResponse(
-        content=json.load(open((Path(__file__).parent.resolve() / "copilots.json")))
+        content={
+            "llama4_maverick_copilot": {
+                "name": "Llama4 Maverick Copilot",
+                "description": "A copilot that uses Llama4 Maverick as its LLM.",
+                "image": "https://github.com/OpenBB-finance/copilot-for-terminal-pro/assets/14093308/7da2a512-93b9-478d-90bc-b8c3dd0cabcf",
+                "endpoints": {"query": "http://localhost:7777/v1/query"},
+                "features": {
+                    "streaming": True,
+                    "widget-dashboard-select": True,
+                    "widget-dashboard-search": True,
+                },
+            }
+        }
     )
 
 
@@ -52,9 +63,10 @@ async def query(request: QueryRequest) -> EventSourceResponse:
 
     openbb_agent = agent.OpenBBAgent(
         query_request=request,
-        system_prompt=SYSTEM_PROMPT,
+        system_prompt=render_system_prompt(request.widgets),
         chat_class=agent.OpenRouterChat,
-        model="deepseek/deepseek-chat-v3-0324",
+        model="meta-llama/llama-4-maverick",
+        functions=[get_widget_data, get_random_stout_beers],
     )
 
     # Stream the SSEs back to the client.

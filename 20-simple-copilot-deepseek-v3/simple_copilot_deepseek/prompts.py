@@ -11,5 +11,4 @@ Use the following guidelines:
 - Narrative Flow: Ensure a logical flow, connecting ideas and points effectively.
 - Incorporate Statistics and Examples: Support points with relevant statistics, examples, or case studies for real-world context.
 
-You cannot retrieve data, but you can answer questions.
 """

@@ -1,6 +1,7 @@
 import inspect
 import json
 import os
+from asyncstdlib import tee
 from magentic import (
     AsyncStreamedResponse,
     Chat,
@@ -42,18 +43,28 @@ from typing import (
     AsyncGenerator,
     Awaitable,
     Callable,
+    Iterable,
     Literal,
     Protocol,
     cast,
 )
 import re
-from openai import AsyncOpenAI
+from openai import NOT_GIVEN, AsyncOpenAI
 from openai.types.chat import (
     ChatCompletionMessageParam,
     ChatCompletionSystemMessageParam,
     ChatCompletionUserMessageParam,
     ChatCompletionAssistantMessageParam,
+    ChatCompletionToolParam,
+    ChatCompletionMessageToolCallParam,
+    ChatCompletionToolMessageParam,
 )
+from openai.types.shared_params import FunctionDefinition as OpenAiFunctionDefinition
+from magentic.chat_model.function_schema import FunctionCallFunctionSchema
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def sanitize_message(message: str) -> str:
@@ -453,13 +464,192 @@ class GeminiChat:
         return self._messages[-1]
 
 
+class OpenRouterChat:
+    def __init__(
+        self,
+        messages: list[AnyMessage],
+        output_types: list[Any] | None = None,  # TODO: Implement this.
+        functions: list[Callable] | None = None,
+        model: str = "gemini-2.0-flash",
+        api_key: str | None = None,
+        show_reasoning: bool = True,
+    ):
+        self._messages = messages
+        self._model = model
+        self._functions = functions
+        self._output_types = output_types
+        self._api_key = api_key or os.environ["OPENROUTER_API_KEY"]
+        self._show_reasoning = show_reasoning
+
+    def add_message(self, message: AnyMessage) -> "OpenRouterChat":
+        self._messages.append(message)
+        return self
+
+    def _get_system_prompt(self) -> str:
+        system_message = next(m for m in self._messages if isinstance(m, SystemMessage))
+        return system_message.content if system_message else ""
+
+    async def _convert_messages(self) -> list[ChatCompletionMessageParam]:
+        converted_messages: list[ChatCompletionMessageParam] = []
+        for message in self._messages:
+            if isinstance(message, SystemMessage):
+                converted_messages.append(
+                    ChatCompletionSystemMessageParam(
+                        role="system", content=message.content
+                    )
+                )
+            elif isinstance(message, UserMessage):
+                converted_messages.append(
+                    ChatCompletionUserMessageParam(role="user", content=message.content)
+                )
+            elif isinstance(message, AssistantMessage):
+                if isinstance(message.content, AsyncStreamedResponse):
+                    async for item in message.content:
+                        if isinstance(item, FunctionCall):
+                            converted_messages.append(
+                                ChatCompletionAssistantMessageParam(
+                                    role="assistant",
+                                    tool_calls=[
+                                        ChatCompletionMessageToolCallParam(
+                                            id=item._unique_id,
+                                            type="function",
+                                            function={
+                                                "name": item.function.__name__,
+                                                "arguments": str(item.arguments),
+                                            },
+                                        )
+                                    ],
+                                )
+                            )
+                        if isinstance(item, AsyncStreamedStr):
+                            content = ""
+                            async for chunk in item:
+                                content += chunk
+                            converted_messages.append(
+                                ChatCompletionAssistantMessageParam(
+                                    role="assistant", content=content
+                                )
+                            )
+            elif isinstance(message, FunctionResultMessage):
+                converted_messages.append(
+                    ChatCompletionToolMessageParam(
+                        role="tool",
+                        tool_call_id=message.function_call._unique_id,
+                        content=message.content,
+                    )
+                )
+        return converted_messages
+
+    def _prepare_tools(
+        self, functions: list[Callable] | None
+    ) -> Iterable[ChatCompletionToolParam] | None:
+        if not functions:
+            return None
+        function_declarations: list[ChatCompletionToolParam] = []
+        for function in functions:
+            schema = FunctionCallFunctionSchema(function)
+            tool_definition = ChatCompletionToolParam(
+                function=OpenAiFunctionDefinition(
+                    name=schema.name,
+                    description=schema.description or "",
+                    parameters=schema.parameters,
+                    strict=True,
+                ),
+                type="function",
+            )
+            # This MUST be included to avoid errors.
+            tool_definition["function"]["parameters"]["additionalProperties"] = False
+
+            function_declarations.append(tool_definition)
+        return function_declarations
+
+    def _get_function(self, function_name: str) -> Callable:
+        for function in self._functions if self._functions else []:
+            if function.__name__ == function_name:
+                return function
+        raise ValueError(f"Function not found: {function_name}")
+
+    async def asubmit(self) -> "OpenRouterChat":
+        client = AsyncOpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=os.environ["OPENROUTER_API_KEY"],
+        )
+
+        stream = await client.chat.completions.create(
+            model=self._model,
+            messages=await self._convert_messages(),
+            tools=self._prepare_tools(self._functions) or NOT_GIVEN,
+            stream=True,
+        )
+
+        async def async_streamed_response() -> (
+            AsyncGenerator[FunctionCall | AsyncStreamedStr | StatusUpdateSSE, None]
+        ):
+            previous, current = tee(stream, n=2)
+            reasoning = ""
+            function_arguments = ""
+            function_name = None
+            async for chunk in previous:
+                if (
+                    self._show_reasoning
+                    and hasattr(chunk.choices[0].delta, "reasoning")
+                    and chunk.choices[0].delta.reasoning
+                ):
+                    if not reasoning:
+                        yield reasoning_step(
+                            event_type="INFO",
+                            message="Model is reasoning...",
+                        )
+                    reasoning += chunk.choices[0].delta.reasoning
+                elif chunk.choices[0].delta.content:
+                    if self._show_reasoning:
+                        if reasoning:
+                            yield reasoning_step(
+                                event_type="INFO",
+                                message="Reasoning complete",
+                                details={"Reasoning": reasoning},
+                            )
+                            reasoning = ""
+
+                    async def async_streamed_str() -> AsyncGenerator[str, None]:
+                        async for chunk in current:
+                            if delta := chunk.choices[0].delta:
+                                if delta.content:
+                                    yield delta.content
+
+                    yield AsyncStreamedStr(async_streamed_str())
+                elif chunk.choices[0].delta.tool_calls:
+                    if function := chunk.choices[0].delta.tool_calls[0].function:
+                        if not function_name:
+                            function_name = function.name
+                        if function.arguments:
+                            function_arguments += function.arguments
+
+                if chunk.choices[0].finish_reason == "tool_calls":
+                    yield FunctionCall(
+                        function=self._get_function(function_name or ""),
+                        **(json.loads(function_arguments) or {}),
+                    )
+                    function_name = None
+                    function_arguments = ""
+
+        self.add_message(
+            AssistantMessage(content=AsyncStreamedResponse(async_streamed_response()))  # type: ignore
+        )
+        return self
+
+    @property
+    def last_message(self) -> AnyMessage:
+        return self._messages[-1]
+
+
 class OpenBBAgent:
     def __init__(
         self,
         query_request: QueryRequest,
         system_prompt: str,
         functions: list[Callable] | None = None,
-        chat_class: type[Chat] | type[GeminiChat] | None = None,
+        chat_class: type[Chat] | type[GeminiChat] | type[OpenRouterChat] | None = None,
         model: str | None = None,
         **kwargs: Any,
     ):
@@ -469,7 +659,7 @@ class OpenBBAgent:
         self.functions = functions
         self.chat_class = chat_class or Chat
         self._model: str | OpenaiChatModel | None = model
-        self._chat: Chat | GeminiChat | None = None
+        self._chat: Chat | GeminiChat | OpenRouterChat | None = None
         self._citations: CitationCollection | None = None
         self._messages: list[AnyMessage] = []
         self._kwargs = kwargs
@@ -524,7 +714,7 @@ class OpenBBAgent:
                 case LlmClientMessage(role="ai") if isinstance(
                     message.content, LlmFunctionCall
                 ):
-                    # Everything is handle in the function call result message.
+                    # Everything is handled in the function call result message.
                     pass
                 case LlmClientFunctionCallResultMessage(role="tool"):
                     if not self.functions:
@@ -576,6 +766,9 @@ class OpenBBAgent:
         function_call.function.request = self.request
 
         # Execute the function.
+        logger.info(
+            f"Executing function: {function_call.function.__name__} with arguments: {function_call.arguments}"
+        )
         async for event in function_call():
             # Yield reasoning steps.
             if isinstance(event, StatusUpdateSSE):
@@ -608,7 +801,9 @@ class OpenBBAgent:
 
             if isinstance(self._chat.last_message.content, AsyncStreamedResponse):
                 async for item in self._chat.last_message.content:
-                    if isinstance(item, AsyncStreamedStr):
+                    if isinstance(item, StatusUpdateSSE):
+                        yield item
+                    elif isinstance(item, AsyncStreamedStr):
                         async for event in self._handle_text_stream(item):
                             yield event
                         return
@@ -617,44 +812,3 @@ class OpenBBAgent:
                             yield event
                             if isinstance(event, FunctionCallSSE):
                                 return
-
-
-async def run_openrouter_agent(
-    messages: list[ChatCompletionMessageParam],
-    model: str,
-    api_key: str,
-) -> AsyncGenerator[dict | StatusUpdateSSE, None]:
-    client = AsyncOpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=api_key,
-    )
-
-    stream = await client.chat.completions.create(
-        model=model, messages=messages, stream=True
-    )
-
-    reasoning = ""
-    async for chunk in stream:
-        if chunk.choices[0].delta.content:
-            if reasoning:
-                yield reasoning_step(
-                    event_type="INFO",
-                    message="Reasoning complete",
-                    details={"Reasoning": reasoning},
-                ).model_dump()
-                reasoning = ""
-            yield {
-                "event": "copilotMessageChunk",
-                "data": json.dumps({"delta": chunk.choices[0].delta.content}),
-            }
-        elif (
-            hasattr(chunk.choices[0].delta, "reasoning")
-            and chunk.choices[0].delta.reasoning
-        ):
-            if not reasoning:
-                yield reasoning_step(
-                    event_type="INFO",
-                    message="Reasoning...",
-                ).model_dump()
-            reasoning += chunk.choices[0].delta.reasoning  # type: ignore
-    return

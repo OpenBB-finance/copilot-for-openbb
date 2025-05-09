@@ -23,7 +23,7 @@ it yourself), take a look at [this example agent](https://github.com/OpenBB-fina
 The architecture consists of two main components:
 
 1. **OpenBB Workspace (Frontend)**: The user interface where queries are entered
-2. **Simple Copilot (Backend)**: Powered by OpenAI, handles the processing of queries and returns answers
+2. **Simple Copilot (Backend)**: Powered by DeepSeek-R1, handles the processing of queries and returns answers
 
 The frontend communicates with the backend via HTTP requests to the `/query`
 endpoint as defined in the copilot.json schema.

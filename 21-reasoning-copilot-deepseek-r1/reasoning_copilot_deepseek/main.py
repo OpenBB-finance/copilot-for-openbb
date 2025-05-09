@@ -1,7 +1,4 @@
-import json
 import logging
-import os
-from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -44,7 +41,19 @@ app.add_middleware(
 def get_copilot_description():
     """Widgets configuration file for the OpenBB Terminal Pro"""
     return JSONResponse(
-        content=json.load(open((Path(__file__).parent.resolve() / "copilots.json")))
+        content={
+            "reasoning_copilot_deepseek": {
+                "name": "Reasoning Deepseek Copilot",
+                "description": "A copilot that uses Deepseek R1 as its LLM.",
+                "image": "https://github.com/OpenBB-finance/copilot-for-terminal-pro/assets/14093308/7da2a512-93b9-478d-90bc-b8c3dd0cabcf",
+                "endpoints": {"query": "http://localhost:7777/v1/query"},
+                "features": {
+                    "streaming": True,
+                    "widget-dashboard-select": False,
+                    "widget-dashboard-search": False,
+                },
+            }
+        }
     )
 
 
@@ -52,20 +61,15 @@ def get_copilot_description():
 async def query(request: QueryRequest) -> EventSourceResponse:
     """Query the Copilot."""
 
-    # This is the main execution loop for the Copilot.
-    async def execution_loop():
-        async for event in agent.run_openrouter_agent(
-            messages=await agent.process_messages(
-                system_prompt=SYSTEM_PROMPT,
-                messages=request.messages,
-            ),
-            model="deepseek/deepseek-r1",
-            api_key=os.environ["OPENROUTER_API_KEY"],
-        ):
-            yield event
+    openbb_agent = agent.OpenBBAgent(
+        query_request=request,
+        system_prompt=SYSTEM_PROMPT,
+        chat_class=agent.OpenRouterChat,
+        model="meta-llama/llama-4-maverick",
+    )
 
     # Stream the SSEs back to the client.
     return EventSourceResponse(
-        content=execution_loop(),
+        content=openbb_agent.run(),
         media_type="text/event-stream",
     )
