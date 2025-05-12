@@ -7,7 +7,6 @@
 			"query": "http://localhost:7777/v1/query"
 		},
 		"features": {
-			"streaming": true,
 			"widget-dashboard-select": false,
 			"widget-dashboard-search": false
 		}

@@ -47,7 +47,6 @@ def get_copilot_description():
                 "description": "A simple copilot that can answer questions and execute internal function calls.",
                 "image": "https://github.com/OpenBB-finance/copilot-for-terminal-pro/assets/14093308/7da2a512-93b9-478d-90bc-b8c3dd0cabcf",
                 "endpoints": {"query": "http://localhost:7777/v1/query"},
-                "features": {"streaming": True},
             }
         }
     )
