@@ -29,7 +29,7 @@ portfolio-commentary/
 │   ├── main.py          # Main FastAPI application
 │   ├── functions.py     # Core functionality
 │   ├── prompts.py       # LLM prompts
-│   └── copilots.json    # Copilot configuration
+│   └── agents.json      # Agent configuration
 ├── common/              # Shared utilities
 ├── pyproject.toml       # Project dependencies
 ├── Dockerfile           # Docker configuration
@@ -76,6 +76,8 @@ poetry run uvicorn portfolio_commentary.main:app --reload --port 7777
 
 ### Docker Deployment
 
+Bring the /common folder to the root, for the docker image.
+
 1. Build the Docker image:
 ```sh
 docker build -t portfolio-commentary .
@@ -90,10 +92,10 @@ docker run -p 7777:7777 --env-file .env portfolio-commentary
 
 The project includes a `fly.toml` configuration for deployment to Fly.io. To deploy:
 
-0. Go into copilots.json and change `"query": "https://portfolio-commentary.fly.dev/v1/query"` to `"query": "https://<YOUR-FLY-IO-APP-NAME>.fly.dev/v1/query"`. This will make sure that OpenBB workspace utilizes this endpoint.
+0. Go into agents.json and change `"query": "https://portfolio-commentary.fly.dev/v1/query"` to `"query": "https://<YOUR-FLY-IO-APP-NAME>.fly.dev/v1/query"`. This will make sure that OpenBB workspace utilizes this endpoint.
 1. Install the Fly CLI
 2. Run `fly launch` to create a new app
-3. Set your environment variables using `fly secrets set`
+3. Set your environment variables using `fly secrets set OPENROUTER_API_KEY="your-api-key"`
 4. Deploy with `fly deploy`
 
 ### Accessing the Documentation
