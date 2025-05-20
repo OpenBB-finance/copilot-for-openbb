@@ -1,0 +1,13 @@
+{
+	"example_copilot": {
+		"name": "OpenBB Agent Copilot",
+		"description": "AI financial analyst using the OpenBB Platform.",
+		"image": "https://github.com/user-attachments/assets/010d7590-0a65-4b3f-b21a-0cbc0d95bcb9",
+		"hasStreaming": true,
+		"hasDocuments": false,
+		"hasFunctionCalling": false,
+		"endpoints": {
+			"query": "http://localhost:7777/v1/query"
+		}
+	}
+}
