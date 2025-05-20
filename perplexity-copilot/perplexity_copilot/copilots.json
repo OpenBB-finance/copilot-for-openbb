@@ -1,0 +1,13 @@
+{
+	"llama_copilot": {
+		"name": "Perplexity Copilot",
+		"description": "Enables users to search for information on the web using Perplexity.",
+		"image": "https://github.com/user-attachments/assets/f079bda8-aff1-4da7-8385-4657824020e8",
+		"hasStreaming": true,
+		"hasDocuments": false,
+		"hasFunctionCalling": false,
+		"endpoints": {
+			"query": "http://localhost:7777/v1/query"
+		}
+	}
+}
