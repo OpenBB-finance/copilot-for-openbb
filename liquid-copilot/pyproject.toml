@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "perplexity-copilot"
+version = "0.1.0"
+description = ""
+authors = ["DidierRLopes <dro.lopes@campus.fct.unl.pt>"]
+readme = "README.md"
+packages = [{include = "perplexity_copilot"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+uvicorn = "^0.30.6"
+fastapi = "^0.112.1"
+openai = "^1.41.0"
+sse-starlette = "^2.1.3"
+python-dotenv = "^1.0.1"
+httpx = "^0.27.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -1,0 +1,13 @@
+{
+	"liquid_copilot": {
+		"name": "Liquid: LFM 40B MoE Copilot",
+		"description": "Liquid's 40.3B Mixture of Experts (MoE) model. Liquid Foundation Models (LFMs) are large neural networks built with computational units rooted in dynamic systems.",
+		"image": "https://github.com/user-attachments/assets/12c547a9-5eb9-45b9-9d4e-fe1cdc89621b",
+		"hasStreaming": true,
+		"hasDocuments": false,
+		"hasFunctionCalling": false,
+		"endpoints": {
+			"query": "http://localhost:7777/v1/query"
+		}
+	}
+}
